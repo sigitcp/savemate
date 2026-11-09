@@ -10,7 +10,7 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h3 class="mb-0 fw-bold">Transaksi</h3>
-        <span class="badge bg-success fs-6"><i class="bi bi-wifi"></i> Mode Auto RFID</span>
+        <span class="badge bg-info text-dark fs-6"><i class="bi bi-wifi"></i> Mode Auto Tap</span>
     </div>
 
     <div class="row g-3">
@@ -61,25 +61,42 @@
         </div>
     </div>
 
-    <!-- Modal Auto RFID (Tanpa Input Manual) -->
+    <!-- Modal Auto Tap NFC / USB -->
     <div class="modal fade" id="rfidModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
         <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title fs-6"><i class="bi bi-wifi"></i> Menunggu Tap Kartu</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="resetRfid()"></button>
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white border-0">
+                    <h5 class="modal-title fs-6 w-100 text-center"><i class="bi bi-wifi me-2"></i>Scan Kartu RFID</h5>
+                    <button type="button" class="btn-close btn-close-white position-absolute end-0 me-3" data-bs-dismiss="modal" onclick="stopNfcAndReset()"></button>
                 </div>
                 <div class="modal-body text-center p-4">
+                    
                     <div id="rfidLoading">
-                        <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;"></div>
-                        <h5 class="fw-bold text-primary mb-2">Silakan Tempelkan Kartu</h5>
-                        <p class="text-muted small">Sistem akan otomatis membaca.</p>
+                        <div class="mb-3">
+                            <i class="bi bi-upc-scan text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-3">Tempelkan Kartu di Sini</h6>
+                        
+                        <!-- Tombol Aktifkan Web NFC -->
+                        <button id="btnStartNfc" class="btn btn-outline-primary w-100 mb-3 py-2" onclick="startWebNfc()">
+                            <i class="bi bi-phone"></i> Klik untuk Aktifkan Scan NFC HP
+                        </button>
+                        
+                        <p class="text-muted small mb-0 bg-light p-2 rounded">
+                            <i class="bi bi-info-circle me-1"></i> 
+                            Sistem akan otomatis membaca saat kartu ditempelkan.
+                        </p>
                     </div>
+
                     <div id="rfidResult" style="display:none;"></div>
                 </div>
-                <div class="modal-footer justify-content-center border-0 pt-0" id="rfidFooter" style="display:none;">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal" onclick="resetRfid()"><i class="bi bi-x-circle"></i> Batal</button>
-                    <button type="button" class="btn btn-success px-4" id="btnLanjut" onclick="prosesTransaksi()"><i class="bi bi-check-circle"></i> Lanjut</button>
+                <div class="modal-footer justify-content-center border-0 pt-0 pb-4" id="rfidFooter" style="display:none;">
+                    <button type="button" class="btn btn-light border" data-bs-dismiss="modal" onclick="stopNfcAndReset()">
+                        <i class="bi bi-x-circle me-1"></i> Batal
+                    </button>
+                    <button type="button" class="btn btn-success px-4" id="btnLanjut" onclick="prosesTransaksi()">
+                        <i class="bi bi-check-circle me-1"></i> Konfirmasi & Lanjut
+                    </button>
                 </div>
             </div>
         </div>
@@ -90,8 +107,10 @@
 <script>
 let cart = {};
 let selectedStudentId = null;
-let nfcBuffer = ""; // Buffer untuk menampung ketikan dari alat RFID
+let nfcBuffer = ""; 
+let abortController = null; 
 
+// --- LOGIKA KERANJANG ---
 document.querySelectorAll('.menu-card').forEach(card => {
     card.addEventListener('click', () => {
         card.style.transform = "scale(0.95)"; setTimeout(() => card.style.transform = "scale(1)", 100);
@@ -128,10 +147,54 @@ document.getElementById('btnReset').addEventListener('click', () => { if(confirm
 
 document.getElementById('btnBayar').addEventListener('click', () => {
     const modal = new bootstrap.Modal(document.getElementById('rfidModal'));
-    modal.show(); resetRfid();
+    modal.show(); 
+    stopNfcAndReset(); 
 });
 
-// FITUR UTAMA: Global Key Listener untuk Alat RFID
+// --- FITUR UTAMA: WEB NFC & USB RFID READER ---
+async function startWebNfc() {
+    if (!('NDEFReader' in window)) {
+        alert("Browser Anda tidak mendukung Web NFC. Harap gunakan Google Chrome di Android, atau gunakan USB RFID Reader via OTG.");
+        return;
+    }
+
+    const btn = document.getElementById('btnStartNfc');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Mendengarkan NFC...';
+    btn.disabled = true;
+    btn.classList.replace('btn-outline-primary', 'btn-primary');
+
+    try {
+        abortController = new AbortController();
+        const ndef = new NDEFReader();
+        await ndef.scan({ signal: abortController.signal });
+        
+        ndef.onreading = event => {
+            event.preventDefault(); 
+            for (const record of event.message.records) {
+                if (record.recordType === "text") {
+                    const decoder = new TextDecoder();
+                    const tokenText = decoder.decode(record.data).trim();
+                    if (tokenText.length > 3) {
+                        checkToken(tokenText);
+                        return; 
+                    }
+                }
+            }
+        };
+
+        ndef.onreadingerror = () => {
+            alert("Gagal membaca tag. Pastikan format kartu adalah NDEF Text.");
+            stopNfcAndReset();
+        };
+
+    } catch (error) {
+        console.error("NFC Error:", error);
+        alert("Gagal mengaktifkan NFC. Pastikan izin sudah diberikan.");
+        stopNfcAndReset();
+    }
+}
+
+// Listener untuk USB RFID Reader (Keyboard Wedge)
 document.addEventListener('keydown', function(e) {
     if (document.getElementById('rfidModal').classList.contains('show')) {
         if (e.key === 'Enter') {
@@ -146,6 +209,23 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
+function stopNfcAndReset() {
+    if (abortController) {
+        abortController.abort(); 
+        abortController = null;
+    }
+    nfcBuffer = "";
+    document.getElementById('rfidLoading').style.display = 'block';
+    document.getElementById('rfidResult').style.display = 'none';
+    document.getElementById('rfidFooter').style.display = 'none';
+    
+    const btn = document.getElementById('btnStartNfc');
+    btn.innerHTML = '<i class="bi bi-phone"></i> Klik untuk Aktifkan Scan NFC HP';
+    btn.disabled = false;
+    btn.classList.replace('btn-primary', 'btn-outline-primary');
+}
+
+// --- FUNGSI CEK TOKEN KE SERVER ---
 function checkToken(token) {
     const total = Object.values(cart).reduce((sum, item) => sum + (item.price * item.qty), 0);
     const items = Object.values(cart).map(item => ({ menu_id: item.id, qty: item.qty }));
@@ -153,7 +233,14 @@ function checkToken(token) {
     document.getElementById('rfidLoading').style.display = 'none';
     const result = document.getElementById('rfidResult');
     result.style.display = 'block';
-    result.innerHTML = '<div class="spinner-border text-primary mb-2"></div><p>Memverifikasi...</p>';
+    
+    // Loading state yang lebih rapi
+    result.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 2.5rem; height: 2.5rem;"></div>
+            <p class="text-muted fw-semibold">Memverifikasi data...</p>
+        </div>
+    `;
 
     fetch('{{ route("kantin.cekToken") }}', {
         method: 'POST',
@@ -163,32 +250,60 @@ function checkToken(token) {
     .then(r => r.json())
     .then(data => {
         if (!data.success) {
-            result.innerHTML = `<div class="alert alert-danger border-danger mb-0"><i class="bi bi-x-octagon-fill fs-1 d-block mb-2"></i><h6 class="fw-bold">Gagal!</h6><p class="mb-0 small">${data.message}</p></div>
-            <button class="btn btn-secondary w-100 mt-3" data-bs-dismiss="modal" onclick="resetRfid()">Tutup / Coba Lagi</button>`;
+            result.innerHTML = `
+                <div class="text-center py-2">
+                    <i class="bi bi-x-octagon-fill text-danger" style="font-size: 3rem;"></i>
+                    <h6 class="fw-bold text-danger mt-2">Gagal!</h6>
+                    <p class="text-muted small mb-3">${data.message}</p>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="stopNfcAndReset()">Coba Lagi</button>
+                </div>
+            `;
             return;
         }
 
         selectedStudentId = data.student.id;
+        
+        // Foto atau Inisial
         let photoHtml = data.student.photo 
-            ? `<img src="${data.student.photo}" class="rounded-circle border border-3 border-success mb-2 shadow-sm" style="width:80px;height:80px;object-fit:cover;">`
-            : `<div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mb-2 shadow-sm" style="width:80px;height:80px;font-size:2rem;font-weight:bold;">${data.student.name.charAt(0)}</div>`;
+            ? `<img src="${data.student.photo}" class="rounded-circle border border-3 border-success shadow-sm mb-2" style="width:90px;height:90px;object-fit:cover;">`
+            : `<div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center shadow-sm mb-2" style="width:90px;height:90px;font-size:2.5rem;font-weight:bold;">${data.student.name.charAt(0)}</div>`;
 
-        result.innerHTML = `<div class="alert alert-success border-success mb-0">
-            <i class="bi bi-check-circle-fill fs-1 d-block mb-2 text-success"></i>
-            <h6 class="fw-bold mb-2">Data Siswa Ditemukan</h6>
-            ${photoHtml}
-            <h5 class="mb-1 fw-bold text-dark">${data.student.name}</h5>
-            <p class="mb-2">Kelas: <span class="badge bg-info text-dark">${data.student.class}</span></p>
-            <hr class="my-2">
-            <div class="d-flex justify-content-between align-items-center">
-                <span class="text-muted small">Total Belanja:</span>
-                <strong class="text-danger fs-5">Rp ${total.toLocaleString('id-ID')}</strong>
+        // Tampilan Popup Sukses yang Rapi & Modern
+        result.innerHTML = `
+            <div class="text-center">
+                <div class="mb-2">
+                    ${photoHtml}
+                </div>
+                <h5 class="fw-bold text-success mb-1">Data Siswa Ditemukan</h5>
+                <p class="text-muted small mb-3">Silakan konfirmasi untuk memproses pembayaran</p>
+                
+                <div class="bg-light rounded p-3 text-start border">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Nama Siswa</span>
+                        <span class="fw-bold text-dark">${data.student.name}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Kelas</span>
+                        <span class="fw-bold text-dark">${data.student.class}</span>
+                    </div>
+                    <hr class="my-2 opacity-50">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted fw-semibold">Total Belanja</span>
+                        <span class="fw-bold text-danger fs-5">Rp ${total.toLocaleString('id-ID')}</span>
+                    </div>
+                </div>
             </div>
-        </div>`;
+        `;
         document.getElementById('rfidFooter').style.display = 'flex';
     })
     .catch(err => { 
-        result.innerHTML = `<div class="alert alert-danger mb-0">Error Koneksi</div><button class="btn btn-secondary w-100 mt-3" onclick="resetRfid()">Coba Lagi</button>`; 
+        result.innerHTML = `
+            <div class="text-center py-2">
+                <i class="bi bi-wifi-off text-danger" style="font-size: 3rem;"></i>
+                <h6 class="fw-bold text-danger mt-2">Error Koneksi</h6>
+                <button class="btn btn-outline-secondary btn-sm mt-2" onclick="stopNfcAndReset()">Coba Lagi</button>
+            </div>
+        `; 
     });
 }
 
@@ -205,13 +320,6 @@ function prosesTransaksi() {
     form.method = 'POST'; form.action = '{{ route("kantin.prosesTransaksi") }}';
     form.innerHTML = `@csrf <input type="hidden" name="student_id" value="${selectedStudentId}"><input type="hidden" name="total" value="${total}">${itemsInputs}`;
     document.body.appendChild(form); form.submit();
-}
-
-function resetRfid() {
-    nfcBuffer = "";
-    document.getElementById('rfidLoading').style.display = 'block';
-    document.getElementById('rfidResult').style.display = 'none';
-    document.getElementById('rfidFooter').style.display = 'none';
 }
 </script>
 @endpush

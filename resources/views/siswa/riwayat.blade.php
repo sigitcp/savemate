@@ -7,108 +7,138 @@
 @endsection
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <h3 class="mb-0 fw-bold">Riwayat Transaksi</h3>
         <a href="{{ route('siswa.dashboard') }}" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Kembali
         </a>
     </div>
 
-    {{-- ===== TAMPILAN DESKTOP / TABLET (TABEL) ===== --}}
+    {{-- FORM FILTER & DOWNLOAD --}}
+    <div class="card shadow-sm border-0 mb-4 p-3">
+        <form method="GET" action="{{ route('siswa.riwayat') }}" class="row g-2 align-items-end">
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold text-muted">Dari Tanggal</label>
+                <input type="date" name="start_date" class="form-control" value="{{ $startDate }}">
+            </div>
+            <div class="col-6 col-md-3">
+                <label class="form-label small fw-bold text-muted">Sampai Tanggal</label>
+                <input type="date" name="end_date" class="form-control" value="{{ $endDate }}">
+            </div>
+            <div class="col-6 col-md-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filter</button>
+            </div>
+            <div class="col-6 col-md-4">
+                <a href="{{ route('siswa.riwayat.pdf', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="btn btn-danger w-100">
+                    <i class="bi bi-file-earmark-pdf"></i> Download PDF
+                </a>
+            </div>
+        </form>
+    </div>
+
+    {{-- ===== TAMPILAN DESKTOP (TABEL) ===== --}}
     <div class="card shadow-sm border-0 d-none d-md-block">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
                         <th>Tanggal & Waktu</th>
-                        <th>Nama Kantin</th>
-                        <th>Rincian Menu</th>
-                        <th class="text-end">Total</th>
+                        <th>Jenis</th>
+                        <th>Keterangan</th>
+                        <th class="text-end">Nominal</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($transactions as $t)
+                    @forelse($activities as $act)
                     <tr>
                         <td>
-                            <div class="fw-bold">{{ $t->transaction_at->format('d/m/Y') }}</div>
-                            <small class="text-muted">{{ $t->transaction_at->format('H:i') }} WIB</small>
+                            <div class="fw-bold">{{ $act->activity_type == 'purchase' ? $act->transaction_at->format('d/m/Y') : $act->created_at->format('d/m/Y') }}</div>
+                            <small class="text-muted">{{ $act->activity_type == 'purchase' ? $act->transaction_at->format('H:i') : $act->created_at->format('H:i') }} WIB</small>
                         </td>
                         <td>
-                            <span class="badge bg-light text-dark border px-2 py-1">
-                                <i class="bi bi-shop"></i> {{ $t->canteen->name }}
-                            </span>
+                            @if($act->activity_type == 'topup')
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="bi bi-arrow-down-circle"></i> Topup Saldo</span>
+                            @else
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="bi bi-bag"></i> Pembelian</span>
+                            @endif
                         </td>
                         <td>
-                            @foreach($t->items as $item)
-                                <div class="small mb-1">
-                                    <span class="fw-semibold">{{ $item->menu->name }}</span> 
-                                    <span class="badge bg-light text-dark border">x{{ $item->qty }}</span>
+                            @if($act->activity_type == 'topup')
+                                <span class="text-muted">Pengisian saldo oleh Admin</span>
+                            @else
+                                <span class="fw-semibold"><i class="bi bi-shop text-primary"></i> {{ $act->canteen->name }}</span>
+                                <div class="mt-1">
+                                    @foreach($act->items as $item)
+                                        <span class="badge bg-light text-dark border me-1">{{ $item->menu->name }} (x{{ $item->qty }})</span>
+                                    @endforeach
                                 </div>
-                            @endforeach
+                            @endif
                         </td>
                         <td class="text-end">
-                            <span class="badge bg-danger fs-6">- Rp {{ number_format($t->total, 0, ',', '.') }}</span>
+                            @if($act->activity_type == 'topup')
+                                <span class="badge bg-success fs-6">+ Rp {{ number_format($act->amount, 0, ',', '.') }}</span>
+                            @else
+                                <span class="badge bg-danger fs-6">- Rp {{ number_format($act->total, 0, ',', '.') }}</span>
+                            @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
                         <td colspan="4" class="text-center text-muted py-5">
-                            <i class="bi bi-receipt fs-1 d-block mb-2"></i>
-                            Belum ada riwayat transaksi
+                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                            Tidak ada transaksi pada periode ini.
                         </td>
                     </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-        @if($transactions->hasPages())
-            <div class="p-3 border-top">{{ $transactions->links() }}</div>
-        @endif
     </div>
 
-    {{-- ===== TAMPILAN HP / MOBILE (CARD LIST) ===== --}}
+    {{-- ===== TAMPILAN HP (CARD LIST) ===== --}}
     <div class="d-md-none">
-        @forelse($transactions as $t)
+        @forelse($activities as $act)
         <div class="card mb-3 shadow-sm border-0">
             <div class="card-body p-3">
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <div>
-                        <h6 class="mb-0 fw-bold text-dark">
-                            <i class="bi bi-shop text-primary"></i> {{ $t->canteen->name }}
-                        </h6>
-                        <small class="text-muted">
-                            <i class="bi bi-calendar3"></i> {{ $t->transaction_at->format('d/m/Y') }} 
-                            <span class="mx-1">•</span> 
-                            <i class="bi bi-clock"></i> {{ $t->transaction_at->format('H:i') }}
-                        </small>
+                        @if($act->activity_type == 'topup')
+                            <h6 class="mb-0 fw-bold text-success"><i class="bi bi-arrow-down-circle"></i> Topup Saldo</h6>
+                            <small class="text-muted">Pengisian saldo oleh Admin</small>
+                        @else
+                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-shop text-primary"></i> {{ $act->canteen->name }}</h6>
+                            <small class="text-muted">
+                                <i class="bi bi-calendar3"></i> {{ $act->transaction_at->format('d/m/Y') }} 
+                                <span class="mx-1">•</span> 
+                                <i class="bi bi-clock"></i> {{ $act->transaction_at->format('H:i') }}
+                            </small>
+                        @endif
                     </div>
-                    <span class="badge bg-danger fs-6 px-2 py-1">- Rp {{ number_format($t->total, 0, ',', '.') }}</span>
+                    @if($act->activity_type == 'topup')
+                        <span class="badge bg-success fs-6 px-2 py-1">+ Rp {{ number_format($act->amount, 0, ',', '.') }}</span>
+                    @else
+                        <span class="badge bg-danger fs-6 px-2 py-1">- Rp {{ number_format($act->total, 0, ',', '.') }}</span>
+                    @endif
                 </div>
                 
-                <hr class="my-2 opacity-25">
-                
-                <div class="ps-1">
-                    @foreach($t->items as $item)
-                        <div class="d-flex justify-content-between small mb-1">
-                            <span class="text-dark">{{ $item->menu->name }}</span>
-                            <span class="text-muted fw-semibold">x{{ $item->qty }}</span>
-                        </div>
-                    @endforeach
-                </div>
+                @if($act->activity_type == 'purchase')
+                    <hr class="my-2 opacity-25">
+                    <div class="ps-1">
+                        @foreach($act->items as $item)
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-dark">{{ $item->menu->name }}</span>
+                                <span class="text-muted fw-semibold">x{{ $item->qty }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
             </div>
         </div>
         @empty
         <div class="text-center text-muted py-5">
-            <i class="bi bi-receipt fs-1 d-block mb-2"></i>
-            <p class="mb-0">Belum ada riwayat transaksi</p>
-            <a href="{{ route('siswa.dashboard') }}" class="btn btn-sm btn-outline-primary mt-2">Kembali ke Dashboard</a>
+            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+            <p class="mb-0">Tidak ada transaksi pada periode ini.</p>
         </div>
         @endforelse
-        
-        @if($transactions->hasPages())
-            <div class="d-flex justify-content-center mt-3">
-                {{ $transactions->links() }}
-            </div>
-        @endif
     </div>
 @endsection

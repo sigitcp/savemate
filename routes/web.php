@@ -57,4 +57,5 @@ Route::middleware(['auth', 'role:kantin'])->prefix('kantin')->name('kantin.')->g
 Route::middleware(['auth', 'role:siswa'])->prefix('siswa')->name('siswa.')->group(function () {
     Route::get('/dashboard', [SiswaController::class, 'dashboard'])->name('dashboard');
     Route::get('/riwayat', [SiswaController::class, 'riwayat'])->name('riwayat');
+    Route::get('/riwayat/pdf', [SiswaController::class, 'downloadPdf'])->name('riwayat.pdf');
 });

@@ -100,12 +100,21 @@ class AdminController extends Controller
         $nextNumber = $existingTokens->max() + 1;
         $token = 'SC-' . date('Y') . '-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
     
-        // 3. Logika Upload Foto Langsung ke Folder Public
+        // 3. Logika Upload Foto Langsung ke Folder public_html (DIUBAH)
         $photoPath = null;
         if ($request->hasFile('photo')) {
             $file = $request->file('photo');
             $filename = time() . '_' . $file->getClientOriginalName();
-            $file->move(public_path('uploads/students'), $filename);
+            
+            // Path ke public_html (1 level di atas folder laravel)
+            $uploadPath = base_path('../public_html/uploads/students');
+            
+            // Buat folder jika belum ada
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+            
+            $file->move($uploadPath, $filename);
             $photoPath = 'uploads/students/' . $filename;
         }
     
@@ -140,60 +149,67 @@ class AdminController extends Controller
             ->with('success', "Siswa berhasil ditambahkan. Token RFID: <strong>{$token}</strong>.");
     }
 
-        // ===== EDIT & UPDATE SISWA =====
-        public function siswaUpdate(Request $request, Student $student)
-        {
-            // Validasi (abaikan unique untuk data yang sedang diedit)
-            $request->validate([
-                'nis' => 'required|unique:students,nis,' . $student->id,
-                'name' => 'required',
-                'class' => 'required',
-                'email' => 'required|email|unique:users,email,' . $student->user_id,
-                'phone' => 'nullable|string|max:20',
-                'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
-                'password' => 'nullable|min:6', // Opsional, hanya diisi jika ingin ganti password
-            ]);
-    
-            $user = $student->user;
-    
-            // 1. Update Data User
-            $user->name = $request->name;
-            $user->email = $request->email;
-            $user->phone = $request->phone;
-            
-            // Hanya update password jika diisi
-            if ($request->filled('password')) {
-                $user->password = Hash::make($request->password);
-            }
-            $user->save();
-    
-            // 2. Update Data Student & Foto
-            $photoPath = $student->photo;
-            
-            if ($request->hasFile('photo')) {
-                // Hapus foto lama jika ada
-                if ($photoPath && file_exists(public_path($photoPath))) {
-                    unlink(public_path($photoPath));
-                }
-                
-                // Upload foto baru
-                $file = $request->file('photo');
-                $filename = time() . '_' . $file->getClientOriginalName();
-                $file->move(public_path('uploads/students'), $filename);
-                $photoPath = 'uploads/students/' . $filename;
-            }
-    
-            $student->update([
-                'nis' => $request->nis,
-                'name' => $request->name,
-                'class' => $request->class,
-                'photo' => $photoPath,
-                // 'rfid_token' TIDAK DIUPDATE (Tetap sama)
-            ]);
-    
-            return redirect()->route('admin.siswa.index')
-                ->with('success', 'Data siswa berhasil diperbarui.');
+    // ===== EDIT & UPDATE SISWA =====
+    public function siswaUpdate(Request $request, Student $student)
+    {
+        // Validasi (abaikan unique untuk data yang sedang diedit)
+        $request->validate([
+            'nis' => 'required|unique:students,nis,' . $student->id,
+            'name' => 'required',
+            'class' => 'required',
+            'email' => 'required|email|unique:users,email,' . $student->user_id,
+            'phone' => 'nullable|string|max:20',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'password' => 'nullable|min:6', // Opsional, hanya diisi jika ingin ganti password
+        ]);
+
+        $user = $student->user;
+
+        // 1. Update Data User
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->phone = $request->phone;
+        
+        // Hanya update password jika diisi
+        if ($request->filled('password')) {
+            $user->password = Hash::make($request->password);
         }
+        $user->save();
+
+        // 2. Update Data Student & Foto (DIUBAH)
+        $photoPath = $student->photo;
+        
+        if ($request->hasFile('photo')) {
+            // Hapus foto lama dari public_html jika ada
+            if ($photoPath && file_exists(base_path('../public_html/' . $photoPath))) {
+                unlink(base_path('../public_html/' . $photoPath));
+            }
+            
+            // Upload foto baru ke public_html
+            $file = $request->file('photo');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            
+            $uploadPath = base_path('../public_html/uploads/students');
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
+            
+            $file->move($uploadPath, $filename);
+            $photoPath = 'uploads/students/' . $filename;
+        }
+
+        $student->update([
+            'nis' => $request->nis,
+            'name' => $request->name,
+            'class' => $request->class,
+            'photo' => $photoPath,
+            // 'rfid_token' TIDAK DIUPDATE (Tetap sama)
+        ]);
+
+        return redirect()->route('admin.siswa.index')
+            ->with('success', 'Data siswa berhasil diperbarui.');
+    }
+
     public function siswaDestroy(Student $student)
     {
         try {
@@ -214,9 +230,9 @@ class AdminController extends Controller
                 $student->user->delete();
             }
             
-            // 5. Hapus file foto jika ada
-            if ($student->photo && file_exists(public_path($student->photo))) {
-                unlink(public_path($student->photo));
+            // 5. Hapus file foto dari public_html (DIUBAH)
+            if ($student->photo && file_exists(base_path('../public_html/' . $student->photo))) {
+                unlink(base_path('../public_html/' . $student->photo));
             }
     
             return redirect()->route('admin.siswa.index')
