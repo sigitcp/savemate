@@ -86,7 +86,7 @@
     </div>
 
     <!-- Tombol Aksi -->
-    <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+    <div class="d-grid gap-2 d-md-flex justify-content-md-start mb-4">
         <a href="{{ route('siswa.riwayat') }}" class="btn btn-primary btn-lg w-100 w-md-auto shadow-sm d-flex align-items-center justify-content-center gap-2">
             <i class="bi bi-clock-history fs-5"></i> 
             <span>Lihat Riwayat Transaksi</span>

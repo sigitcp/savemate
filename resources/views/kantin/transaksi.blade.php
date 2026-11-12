@@ -38,7 +38,7 @@
 
         <!-- Keranjang -->
         <div class="col-12 col-md-5 col-lg-4">
-            <div class="card shadow-sm border-0 position-sticky" style="top: 20px; z-index: 100;">
+            <div class="card shadow-sm border-0 position-sticky mb-4" style="top: 20px; z-index: 100;">
                 <div class="card-header bg-white py-3">
                     <h5 class="mb-0 fs-6 fw-bold"><i class="bi bi-cart3"></i> Keranjang</h5>
                 </div>

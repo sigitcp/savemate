@@ -110,34 +110,33 @@ class SiswaController extends Controller
         return view('siswa.riwayat', compact('activities', 'startDate', 'endDate', 'student'));
     }
 
-    // 5. Fitur Download PDF
-    public function downloadPdf(Request $request)
-    {
-        $student = auth()->user()->student;
-        $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
-        $endDate = $request->input('end_date', now()->format('Y-m-d'));
-        $endDateTime = $endDate . ' 23:59:59';
+    // public function downloadPdf(Request $request)
+    // {
+    //     $student = auth()->user()->student;
+    //     $startDate = $request->input('start_date', now()->subDays(30)->format('Y-m-d'));
+    //     $endDate = $request->input('end_date', now()->format('Y-m-d'));
+    //     $endDateTime = $endDate . ' 23:59:59';
 
-        $purchases = Transaction::where('student_id', $student->id)
-            ->where('status', 'success')
-            ->whereBetween('transaction_at', [$startDate, $endDateTime])
-            ->with('canteen', 'items.menu')
-            ->get()
-            ->map(function ($item) { $item->activity_type = 'purchase'; return $item; });
+    //     $purchases = Transaction::where('student_id', $student->id)
+    //         ->where('status', 'success')
+    //         ->whereBetween('transaction_at', [$startDate, $endDateTime])
+    //         ->with('canteen', 'items.menu')
+    //         ->get()
+    //         ->map(function ($item) { $item->activity_type = 'purchase'; return $item; });
 
-        $topups = WalletMutation::whereHas('wallet', function ($q) use ($student) {
-                $q->where('student_id', $student->id);
-            })
-            ->where('type', 'topup')
-            ->whereBetween('created_at', [$startDate, $endDateTime])
-            ->get()
-            ->map(function ($item) { $item->activity_type = 'topup'; return $item; });
+    //     $topups = WalletMutation::whereHas('wallet', function ($q) use ($student) {
+    //             $q->where('student_id', $student->id);
+    //         })
+    //         ->where('type', 'topup')
+    //         ->whereBetween('created_at', [$startDate, $endDateTime])
+    //         ->get()
+    //         ->map(function ($item) { $item->activity_type = 'topup'; return $item; });
 
-        $activities = $purchases->concat($topups)->sortByDesc(function ($item) {
-            return $item->activity_type === 'purchase' ? $item->transaction_at : $item->created_at;
-        })->values();
+    //     $activities = $purchases->concat($topups)->sortByDesc(function ($item) {
+    //         return $item->activity_type === 'purchase' ? $item->transaction_at : $item->created_at;
+    //     })->values();
 
-        $pdf = Pdf::loadView('siswa.riwayat-pdf', compact('activities', 'startDate', 'endDate', 'student'));
-        return $pdf->download('Riwayat_Transaksi_' . $student->nis . '.pdf');
-    }
+    //     $pdf = Pdf::loadView('siswa.riwayat-pdf', compact('activities', 'startDate', 'endDate', 'student'));
+    //     return $pdf->download('Riwayat_Transaksi_' . $student->nis . '.pdf');
+    // }
 }

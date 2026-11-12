@@ -127,21 +127,47 @@
             </main>
         </div>
 
-        {{-- ===== BOTTOM NAVIGATION (Hanya muncul di HP, khusus role Kantin) ===== --}}
-        @if(auth()->check() && auth()->user()->role === 'kantin')
+        {{-- ===== BOTTOM NAVIGATION (Muncul di HP untuk Kantin & Siswa) ===== --}}
+        @if(auth()->check() && in_array(auth()->user()->role, ['kantin', 'siswa']))
         <nav class="d-md-none fixed-bottom bg-white border-top shadow-lg p-2 d-flex justify-content-around" style="z-index: 1050;">
-            <a href="{{ route('kantin.dashboard') }}" class="text-center text-decoration-none {{ request()->routeIs('kantin.dashboard') ? 'text-primary fw-bold' : 'text-muted' }}">
-                <i class="bi bi-speedometer2 d-block fs-4"></i>
-                <small style="font-size: 10px;">Dashboard</small>
-            </a>
-            <a href="{{ route('kantin.transaksi') }}" class="text-center text-decoration-none {{ request()->routeIs('kantin.transaksi') ? 'text-primary fw-bold' : 'text-muted' }}">
-                <i class="bi bi-cart-check d-block fs-4"></i>
-                <small style="font-size: 10px;">Transaksi</small>
-            </a>
-            <a href="{{ route('kantin.riwayat') }}" class="text-center text-decoration-none {{ request()->routeIs('kantin.riwayat') ? 'text-primary fw-bold' : 'text-muted' }}">
-                <i class="bi bi-clock-history d-block fs-4"></i>
-                <small style="font-size: 10px;">Riwayat</small>
-            </a>
+            
+            {{-- MENU KHUSUS KANTIN --}}
+            @if(auth()->user()->role === 'kantin')
+                <a href="{{ route('kantin.dashboard') }}" class="text-center text-decoration-none {{ request()->routeIs('kantin.dashboard') ? 'text-primary fw-bold' : 'text-muted' }}">
+                    <i class="bi bi-speedometer2 d-block fs-4"></i>
+                    <small style="font-size: 10px;">Dashboard</small>
+                </a>
+                <a href="{{ route('kantin.transaksi') }}" class="text-center text-decoration-none {{ request()->routeIs('kantin.transaksi') ? 'text-primary fw-bold' : 'text-muted' }}">
+                    <i class="bi bi-cart-check d-block fs-4"></i>
+                    <small style="font-size: 10px;">Transaksi</small>
+                </a>
+                <a href="{{ route('kantin.riwayat') }}" class="text-center text-decoration-none {{ request()->routeIs('kantin.riwayat') ? 'text-primary fw-bold' : 'text-muted' }}">
+                    <i class="bi bi-clock-history d-block fs-4"></i>
+                    <small style="font-size: 10px;">Riwayat</small>
+                </a>
+            @endif
+
+            {{-- MENU KHUSUS SISWA --}}
+            @if(auth()->user()->role === 'siswa')
+                <a href="{{ route('siswa.dashboard') }}" class="text-center text-decoration-none {{ request()->routeIs('siswa.dashboard') ? 'text-primary fw-bold' : 'text-muted' }}">
+                    <i class="bi bi-house d-block fs-4"></i>
+                    <small style="font-size: 10px;">Home</small>
+                </a>
+                <a href="{{ route('siswa.riwayat') }}" class="text-center text-decoration-none {{ request()->routeIs('siswa.riwayat') ? 'text-primary fw-bold' : 'text-muted' }}">
+                    <i class="bi bi-clock-history d-block fs-4"></i>
+                    <small style="font-size: 10px;">Riwayat</small>
+                </a>
+            @endif
+
+            {{-- TOMBOL LOGOUT (Untuk Semua Role Mobile) --}}
+            <form action="{{ route('logout') }}" method="POST" class="d-flex align-items-center">
+                @csrf
+                <button type="submit" class="btn btn-link text-danger text-decoration-none p-0 d-flex flex-column align-items-center border-0" style="font-size: 10px;">
+                    <i class="bi bi-box-arrow-right d-block fs-4 mb-1"></i>
+                    <span>Logout</span>
+                </button>
+            </form>
+
         </nav>
         @endif
         {{-- ===== AKHIR BOTTOM NAVIGATION ===== --}}

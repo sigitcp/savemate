@@ -7,16 +7,63 @@
 @endsection
 
 @section('content')
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    {{-- CSS KHUSUS UNTUK CETAK / PRINT --}}
+    <style>
+        @media print {
+            /* Sembunyikan semua elemen di halaman */
+            body * {
+                visibility: hidden;
+            }
+            /* Tampilkan hanya area laporan ini */
+            #area-laporan, #area-laporan * {
+                visibility: visible;
+            }
+            #area-laporan {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+                background: white !important;
+                color: black !important;
+            }
+            /* Paksa tampilan tabel rapi saat print */
+            .table { width: 100% !important; border-collapse: collapse !important; }
+            .table th, .table td { border: 1px solid #000 !important; padding: 8px !important; }
+            .no-print { display: none !important; }
+            .badge { border: 1px solid #000 !important; color: #000 !important; background: none !important; }
+        }
+    </style>
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2 no-print">
         <h3 class="mb-0 fw-bold">Riwayat Transaksi</h3>
         <a href="{{ route('siswa.dashboard') }}" class="btn btn-sm btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Kembali
         </a>
     </div>
 
-    {{-- FORM FILTER & DOWNLOAD --}}
-    <div class="card shadow-sm border-0 mb-4 p-3">
-        <form method="GET" action="{{ route('siswa.riwayat') }}" class="row g-2 align-items-end">
+    {{-- AREA YANG AKAN DICETAK --}}
+    <div id="area-laporan" class="card shadow-sm border-0 mb-4 p-4">
+        
+        {{-- Header Laporan (Hanya muncul rapi saat di-print) --}}
+        <div class="text-center mb-4 d-none d-print-block">
+            <h4 class="fw-bold mb-1">SAVEMATE - SMART CANTEEN</h4>
+            <p class="text-muted mb-0">Laporan Riwayat Transaksi Siswa</p>
+            <hr class="border-dark">
+        </div>
+
+        <div class="row mb-3 no-print">
+            <div class="col-md-6">
+                <strong>Nama:</strong> {{ $student->name }}<br>
+                <strong>NIS:</strong> {{ $student->nis }} | <strong>Kelas:</strong> {{ $student->class }}
+            </div>
+            <div class="col-md-6 text-md-end">
+                <strong>Periode:</strong> {{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} s/d {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}
+            </div>
+        </div>
+
+        {{-- FORM FILTER (Tidak akan tercetak) --}}
+        <form method="GET" action="{{ route('siswa.riwayat') }}" class="row g-2 align-items-end mb-4 no-print">
             <div class="col-6 col-md-3">
                 <label class="form-label small fw-bold text-muted">Dari Tanggal</label>
                 <input type="date" name="start_date" class="form-control" value="{{ $startDate }}">
@@ -25,24 +72,20 @@
                 <label class="form-label small fw-bold text-muted">Sampai Tanggal</label>
                 <input type="date" name="end_date" class="form-control" value="{{ $endDate }}">
             </div>
-            <div class="col-6 col-md-2">
-                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-funnel"></i> Filter</button>
-            </div>
-            <div class="col-6 col-md-4">
-                <a href="{{ route('siswa.riwayat.pdf', ['start_date' => $startDate, 'end_date' => $endDate]) }}" class="btn btn-danger w-100">
-                    <i class="bi bi-file-earmark-pdf"></i> Download PDF
-                </a>
+            <div class="col-12 col-md-6 d-flex gap-2 mt-3 mt-md-0">
+                <button type="submit" class="btn btn-primary flex-grow-1"><i class="bi bi-funnel"></i> Filter</button>
+                <button type="button" onclick="cetakLaporan()" class="btn btn-danger flex-grow-1">
+                    <i class="bi bi-printer"></i> Cetak / Simpan PDF
+                </button>
             </div>
         </form>
-    </div>
 
-    {{-- ===== TAMPILAN DESKTOP (TABEL) ===== --}}
-    <div class="card shadow-sm border-0 d-none d-md-block">
+        {{-- TABEL RIWAYAT (Akan tercetak rapi) --}}
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>Tanggal & Waktu</th>
+                        <th>Tanggal</th>
                         <th>Jenis</th>
                         <th>Keterangan</th>
                         <th class="text-end">Nominal</th>
@@ -52,40 +95,38 @@
                     @forelse($activities as $act)
                     <tr>
                         <td>
-                            <div class="fw-bold">{{ $act->activity_type == 'purchase' ? $act->transaction_at->format('d/m/Y') : $act->created_at->format('d/m/Y') }}</div>
-                            <small class="text-muted">{{ $act->activity_type == 'purchase' ? $act->transaction_at->format('H:i') : $act->created_at->format('H:i') }} WIB</small>
+                            {{ $act->activity_type == 'purchase' ? $act->transaction_at->format('d/m/Y H:i') : $act->created_at->format('d/m/Y H:i') }}
                         </td>
                         <td>
                             @if($act->activity_type == 'topup')
-                                <span class="badge bg-success bg-opacity-10 text-success border border-success"><i class="bi bi-arrow-down-circle"></i> Topup Saldo</span>
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success">Topup</span>
                             @else
-                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger"><i class="bi bi-bag"></i> Pembelian</span>
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger">Beli</span>
                             @endif
                         </td>
                         <td>
                             @if($act->activity_type == 'topup')
-                                <span class="text-muted">Pengisian saldo oleh Admin</span>
+                                Pengisian saldo oleh Admin
                             @else
-                                <span class="fw-semibold"><i class="bi bi-shop text-primary"></i> {{ $act->canteen->name }}</span>
-                                <div class="mt-1">
+                                <strong>{{ $act->canteen->name }}</strong><br>
+                                <small class="text-muted">
                                     @foreach($act->items as $item)
-                                        <span class="badge bg-light text-dark border me-1">{{ $item->menu->name }} (x{{ $item->qty }})</span>
+                                        {{ $item->menu->name }} (x{{ $item->qty }}){{ !$loop->last ? ',' : '' }}
                                     @endforeach
-                                </div>
+                                </small>
                             @endif
                         </td>
-                        <td class="text-end">
+                        <td class="text-end fw-bold">
                             @if($act->activity_type == 'topup')
-                                <span class="badge bg-success fs-6">+ Rp {{ number_format($act->amount, 0, ',', '.') }}</span>
+                                <span class="text-success">+ Rp {{ number_format($act->amount, 0, ',', '.') }}</span>
                             @else
-                                <span class="badge bg-danger fs-6">- Rp {{ number_format($act->total, 0, ',', '.') }}</span>
+                                <span class="text-danger">- Rp {{ number_format($act->total, 0, ',', '.') }}</span>
                             @endif
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="4" class="text-center text-muted py-5">
-                            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                        <td colspan="4" class="text-center text-muted py-4">
                             Tidak ada transaksi pada periode ini.
                         </td>
                     </tr>
@@ -93,52 +134,20 @@
                 </tbody>
             </table>
         </div>
-    </div>
 
-    {{-- ===== TAMPILAN HP (CARD LIST) ===== --}}
-    <div class="d-md-none">
-        @forelse($activities as $act)
-        <div class="card mb-3 shadow-sm border-0">
-            <div class="card-body p-3">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <div>
-                        @if($act->activity_type == 'topup')
-                            <h6 class="mb-0 fw-bold text-success"><i class="bi bi-arrow-down-circle"></i> Topup Saldo</h6>
-                            <small class="text-muted">Pengisian saldo oleh Admin</small>
-                        @else
-                            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-shop text-primary"></i> {{ $act->canteen->name }}</h6>
-                            <small class="text-muted">
-                                <i class="bi bi-calendar3"></i> {{ $act->transaction_at->format('d/m/Y') }} 
-                                <span class="mx-1">•</span> 
-                                <i class="bi bi-clock"></i> {{ $act->transaction_at->format('H:i') }}
-                            </small>
-                        @endif
-                    </div>
-                    @if($act->activity_type == 'topup')
-                        <span class="badge bg-success fs-6 px-2 py-1">+ Rp {{ number_format($act->amount, 0, ',', '.') }}</span>
-                    @else
-                        <span class="badge bg-danger fs-6 px-2 py-1">- Rp {{ number_format($act->total, 0, ',', '.') }}</span>
-                    @endif
-                </div>
-                
-                @if($act->activity_type == 'purchase')
-                    <hr class="my-2 opacity-25">
-                    <div class="ps-1">
-                        @foreach($act->items as $item)
-                            <div class="d-flex justify-content-between small mb-1">
-                                <span class="text-dark">{{ $item->menu->name }}</span>
-                                <span class="text-muted fw-semibold">x{{ $item->qty }}</span>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
+        {{-- Footer Laporan (Hanya muncul saat di-print) --}}
+        <div class="mt-4 pt-3 border-top d-none d-print-block text-end text-muted small">
+            Dicetak pada: {{ now()->format('d/m/Y H:i:s') }} WIB<br>
+            Sistem SaveMate - Smart Canteen
         </div>
-        @empty
-        <div class="text-center text-muted py-5">
-            <i class="bi bi-inbox fs-1 d-block mb-2"></i>
-            <p class="mb-0">Tidak ada transaksi pada periode ini.</p>
-        </div>
-        @endforelse
     </div>
 @endsection
+
+@push('scripts')
+<script>
+function cetakLaporan() {
+    // Panggil dialog print bawaan browser/HP
+    window.print();
+}
+</script>
+@endpush
